@@ -1,3 +1,4 @@
+import java.util.ArrayList;
 import java.util.List;
 
 public class LOLChamp {
@@ -15,6 +16,10 @@ public class LOLChamp {
 
     public LOLChamp(String name) {
         this.name = name;
+        this.species = new ArrayList<>();
+        this.regions = new ArrayList<>();
+        this.positions = new ArrayList<>();
+        this.classes = new ArrayList<>();
     }
 
     public LOLChamp(String name, String gender, String resource, String rangeType, int releaseYear,
@@ -29,7 +34,6 @@ public class LOLChamp {
         this.species = species;
         this.regions = regions;
     }
-
 
     // Override toString for better readability
     @Override

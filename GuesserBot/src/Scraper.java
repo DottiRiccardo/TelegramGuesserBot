@@ -4,6 +4,7 @@ import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class Scraper {
@@ -14,18 +15,13 @@ public class Scraper {
     public List<String> findAllChampions() {
         List<String> champions = new ArrayList<>();
         try {
-            System.out.println("Connettendo alla pagina principale...");
             Document main = Jsoup.connect(mainWebUrl).get();
-            System.out.println("Pagina caricata con successo.");
 
-            // Selezionare tutti gli elementi con la classe specificata
             Elements champElements = main.select("td[style=text-align:left;] > span.inline-image > span[style=white-space:normal;] a");
             System.out.println("Numero di elementi trovati: " + champElements.size());
 
             for (Element champElement : champElements) {
-                // Estrarre il testo del tag <a>
                 String champName = champElement.textNodes().get(0).text();
-                System.out.println("Nome campione trovato: " + champName);
                 champions.add(champName);
             }
         } catch (IOException e) {
@@ -38,7 +34,8 @@ public class Scraper {
         try {
             LOLChamp Champ = new LOLChamp(champName);
 
-            Document stats = Jsoup.connect(statsWebUrl + champName).get();
+            String urlName = champName.contains("&") ? champName.split("&")[0].trim() : champName;
+            Document stats = Jsoup.connect(statsWebUrl + urlName).get();
 
             Elements rowsStats = stats.select("div.infobox-data-row");
 
@@ -49,32 +46,29 @@ public class Scraper {
                 if (label != null && value != null) {
                     switch (label.text()) {
                         case "Position(s)":
-                            System.out.println("Position: " + value.text());
+                            Champ.positions = Arrays.asList(value.text().split("\\s+"));
                             break;
-                        case "Class(es)":
-                            System.out.println("Class: " + value.text());
+                        case "Legacy":
+                            Champ.classes = Arrays.asList(value.text().split("\\s+"));
                             break;
                         case "Range type":
                             Champ.rangeType = value.text();
-                            System.out.println("Range type: " + value.text());
                             break;
                         case "Resource":
-                            System.out.println("Resource: " + value.text());
+                            Champ.resource = value.text().replaceAll("\\(.*?\\)", "").trim();
                             break;
                         case "Release date":
                             String releaseDate = value.text();
                             if (releaseDate.length() >= 4) {
                                 int year = Integer.parseInt(releaseDate.substring(0, 4));
-                                System.out.println("Release year: " + year);
-                            } else {
-                                System.out.println("Release year: Data not valid");
+                                Champ.releaseYear = year;
                             }
                             break;
                     }
                 }
             }
 
-            Document lore = Jsoup.connect(loreWebUrl + champName).get();
+            Document lore = Jsoup.connect(loreWebUrl + urlName).get();
 
             Elements rowsLore = lore.select("div.infobox-data-row");
 
@@ -87,13 +81,13 @@ public class Scraper {
                         case "Pronoun(s)":
                             String pronouns = value.text();
                             if (pronouns.contains("He/Him") && pronouns.contains("She/Her")) {
-                                System.out.println("Gender: Other");
+                                Champ.gender = "Other";
                             } else if (pronouns.contains("He/Him")) {
-                                System.out.println("Gender: Male");
+                                Champ.gender = "Male";
                             } else if (pronouns.contains("She/Her")) {
-                                System.out.println("Gender: Female");
+                                Champ.gender = "Female";
                             } else {
-                                System.out.println("Gender: Unknown");
+                                Champ.gender = "Other";
                             }
                             break;
                         case "Species":
@@ -103,19 +97,20 @@ public class Scraper {
                                     if (!specie.select("s").isEmpty()) {
                                         continue;
                                     } else {
-                                        System.out.println("Species: " + specie.text());
+                                        Champ.species.add(value.text().replaceAll("\\(.*?\\)", "").trim());
                                     }
                                 }
                             } else {
-                                System.out.println("Species: " + value.text());
+                                Champ.species.add(value.text().replaceAll("\\(.*?\\)", "").trim());
                             }
                             break;
                         case "Region(s)":
-                            System.out.println("Region: " + value.text());
+                            Champ.regions = Arrays.asList(value.text().split("\\s+"));
                             break;
                     }
                 }
             }
+            System.out.println(Champ.toString());
         } catch (IOException e) {
             System.err.println("Errore durante il caricamento della pagina: " + e.getMessage());
         }

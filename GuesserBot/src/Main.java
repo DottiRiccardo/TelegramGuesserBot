@@ -1,15 +1,22 @@
 import org.telegram.telegrambots.longpolling.TelegramBotsLongPollingApplication;
 import java.util.List;
 
-
 public class Main {
     public static void main(String[] args) {
         Scraper scraper = new Scraper();
 
-        //List<String> champions = scraper.findAllChampions();
-        //System.out.println("Lista dei campioni trovati: " + champions);
+        /*
+        List<String> champions = scraper.findAllChampions();
+        System.out.println("Lista dei campioni trovati: " + champions);
 
-        scraper.test("Bard");
+        for (String champ : champions) {
+            System.out.println(champ);
+
+        }
+
+        */
+
+        scraper.test("Nunu & Willump");
 
         /*
         String botToken = "7420686675:AAHhkvjQl8B3lZ-xYOLynY9AgPggFPcTQj4";
