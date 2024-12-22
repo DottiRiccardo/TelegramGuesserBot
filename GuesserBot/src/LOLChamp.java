@@ -22,20 +22,6 @@ public class LOLChamp {
         this.classes = new ArrayList<>();
     }
 
-    public LOLChamp(String name, String gender, String resource, String rangeType, int releaseYear,
-                    List<String> positions, List<String> classes, List<String> species, List<String> regions) {
-        this.name = name;
-        this.gender = gender;
-        this.resource = resource;
-        this.rangeType = rangeType;
-        this.releaseYear = releaseYear;
-        this.positions = positions;
-        this.classes = classes;
-        this.species = species;
-        this.regions = regions;
-    }
-
-    // Override toString for better readability
     @Override
     public String toString() {
         return "LOLChamp{" +

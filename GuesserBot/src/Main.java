@@ -3,20 +3,17 @@ import java.util.List;
 
 public class Main {
     public static void main(String[] args) {
-        Scraper scraper = new Scraper();
 
-        /*
+        Scraper scraper = new Scraper();
+        DB db = new DB("tguesserbot", "root", "");
+
         List<String> champions = scraper.findAllChampions();
         System.out.println("Lista dei campioni trovati: " + champions);
 
         for (String champ : champions) {
-            System.out.println(champ);
-
+            LOLChamp a = scraper.getChamp(champ);
+            db.insertChamp(a);
         }
-
-        */
-
-        scraper.test("Nunu & Willump");
 
         /*
         String botToken = "7420686675:AAHhkvjQl8B3lZ-xYOLynY9AgPggFPcTQj4";

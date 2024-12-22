@@ -30,7 +30,7 @@ public class Scraper {
         return champions;
     }
 
-    public void test(String champName) {
+    public LOLChamp getChamp(String champName) {
         try {
             LOLChamp Champ = new LOLChamp(champName);
 
@@ -97,7 +97,7 @@ public class Scraper {
                                     if (!specie.select("s").isEmpty()) {
                                         continue;
                                     } else {
-                                        Champ.species.add(value.text().replaceAll("\\(.*?\\)", "").trim());
+                                        Champ.species.add(specie.text().replaceAll("\\(.*?\\)", "").trim());
                                     }
                                 }
                             } else {
@@ -110,9 +110,10 @@ public class Scraper {
                     }
                 }
             }
-            System.out.println(Champ.toString());
+            return Champ;
         } catch (IOException e) {
             System.err.println("Errore durante il caricamento della pagina: " + e.getMessage());
         }
+        return new LOLChamp("");
     }
 }
