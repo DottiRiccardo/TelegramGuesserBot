@@ -10,13 +10,14 @@ import java.util.*;
 public class Bot implements LongPollingSingleThreadUpdateConsumer {
     private final TelegramClient telegramClient;
     private static DB db;
+    private static final long ADMIN_CHAT_ID = 1030344509;
+
     private Map<Long, List<String>> limitations;
     private Map<Long, Game> onGames;
-    private static final long ADMIN_CHAT_ID = 1030344509;
 
     public Bot(String botToken) {
         telegramClient = new OkHttpTelegramClient(botToken);
-        db = new DB("tguesserbot", "root", "");
+        db = new DB("test", "root", "");
         limitations = new HashMap<>();
         onGames = new HashMap<>();
     }
@@ -30,13 +31,21 @@ public class Bot implements LongPollingSingleThreadUpdateConsumer {
         String messageText = update.getMessage().getText();
 
         if (update.hasMessage() && update.getMessage().hasText()) {
+            if (!onGames.containsKey(chat_id)) {
+                onGames.put(chat_id, new Game());
+            }
+
+            if (!limitations.containsKey(chat_id)) {
+                limitations.putIfAbsent(chat_id, new ArrayList<>());
+            }
+
             if (!db.checkChatId(chat_id) && !messageText.startsWith("/start") && !messageText.startsWith("/username")) {
                 sendMessage(chat_id, "You must set a username first using /username [name].");
                 return;
             }
 
-            if (onGames.containsKey(chat_id) && !(messageText.startsWith("/try") || messageText.startsWith("/list"))) {
-                sendMessage(chat_id, "You can only use /try or /list during an active game.");
+            if (onGames.get(chat_id).randomName == null && messageText.startsWith("/try")) {
+                sendMessage(chat_id, "You can only use /try during an active game.");
                 return;
             }
 
@@ -60,10 +69,7 @@ public class Bot implements LongPollingSingleThreadUpdateConsumer {
                     playerStats(chat_id);
                     break;
                 case "/addlimitation":
-                    addLimitation(chat_id, messageText);
-                    break;
-                case "/guidelimitation":
-                    guideLimitation(chat_id, messageText);
+                    addGuideLimitation(chat_id, messageText);
                     break;
                 case "/clearlimitations":
                     clearLimitations(chat_id);
@@ -99,17 +105,17 @@ public class Bot implements LongPollingSingleThreadUpdateConsumer {
 
     private void help(long chat_id) {
         String helpText = "Here are the available commands:\n" +
-                "/start - Start the game\n" +
-                "/help - Show this help message\n" +
-                "/username [name] - Set your username\n" +
-                "/list - Show a list of available champions\n" +
-                "/try [champion name] - Try to guess a champion\n" +
-                "/stats - Show your game statistics\n" +
-                "/addlimitation [condition] - Add a limitation for champion listing\n" +
-                "/clearlimitations - Clear all limitations for champion listing\n" +
+                "/start - Start the bot\n" +
                 "/play - Start a new game\n" +
+                "/try [champion name] - Try to guess a champion\n" +
+                "/list - Show a list of available champions\n" +
+                "/addlimitation - Guide to set limitations for champion listing\n" +
+                "/clearlimitations - Clear all limitations for champion listing\n" +
+                "/stats - Show your game statistics\n" +
                 "/topplayer - Show the top players\n" +
-                "/admin [action] - Admin-only command.";
+                "/username [name] - Set your username\n" +
+                "/help - Show this help message\n" +
+                "/adminUpdateChamp - Admin-only command to update champion data\n";
         sendMessage(chat_id, helpText);
     }
 
@@ -156,7 +162,7 @@ public class Bot implements LongPollingSingleThreadUpdateConsumer {
 
         String guessedChampionName = messageText.substring(5).trim();
 
-        if (!onGames.containsKey(chat_id)) {
+        if (onGames.get(chat_id) == null || onGames.get(chat_id).randomName.isEmpty()) {
             sendMessage(chat_id, "No game is active. Use /play to start a new game.");
             return;
         }
@@ -185,8 +191,6 @@ public class Bot implements LongPollingSingleThreadUpdateConsumer {
         if ((guessedChampion.toString()).equals(targetChampion.toString())) {
             response.append("\n\uD83C\uDF89 Congratulations! You guessed the champion correctly in your " + onGames.get(chat_id).getNTry() + " try!");
 
-            System.out.println(limitations.get(chat_id).isEmpty());
-            System.out.println(limitations.get(chat_id).toString());
             if (limitations.get(chat_id).isEmpty()) {
                 PlayerStats ps = db.getStats(chat_id);
                 float avTry = ((ps.AverageTry * ps.ChampFound) + onGames.get(chat_id).getNTry()) / (ps.ChampFound + 1);
@@ -197,8 +201,8 @@ public class Bot implements LongPollingSingleThreadUpdateConsumer {
             }
 
             // end game
-            onGames.remove(chat_id);
-            limitations.remove(chat_id);
+            onGames.put(chat_id, new Game());
+            limitations.get(chat_id).clear();
         }
 
         sendMessage(chat_id, response.toString());
@@ -238,38 +242,67 @@ public class Bot implements LongPollingSingleThreadUpdateConsumer {
         sendMessage(chat_id, stats);
     }
 
-    private void addLimitation(long chat_id, String messageText) {
-        String condition = messageText.substring(14).trim();
-        if (condition.isEmpty()) {
-            sendMessage(chat_id, "Please provide a valid condition.");
-            return;
-        }
+    private void addGuideLimitation(long chat_id, String messageText) {
+        String[] parts = messageText.split(" ");
+        Map<String, List<String>> possibleValues = db.getPossibleValues();
 
-        limitations.putIfAbsent(chat_id, new ArrayList<>());
+        if (parts.length == 1) {
+            StringBuilder info = new StringBuilder("To set limitations, follow this guide:\n");
+            info.append("Select a category to limit with the number:\n");
 
-        limitations.get(chat_id).add(condition);
+            int index = 1;
+            for (String key : possibleValues.keySet()) {
+                info.append("   ").append(index++).append(") ").append(key).append("\n");
+            }
+            sendMessage(chat_id, info.toString());
+        } else if (parts.length == 2) {
+            try {
+                int option = Integer.parseInt(parts[1]);
+                List<String> keys = new ArrayList<>(possibleValues.keySet());
 
-        List<String> champions = db.getChampNamesByCases(limitations.get(chat_id));
-        if (champions.size() > 1) {
-            sendMessage(chat_id, "Limitation added: " + condition + "\nNote: Scores won't be counted if limitations are active.");
+                if (option >= 1 && option <= keys.size()) {
+                    String selectedKey = keys.get(option - 1);
+                    List<String> values = possibleValues.get(selectedKey);
+
+                    StringBuilder response = new StringBuilder("You chose to limit by: ").append(selectedKey).append("\n");
+                    response.append("Here are the possible options:\n");
+                    for (String value : values) {
+                        response.append("   - ").append(value).append("\n");
+                    }
+                    response.append("\nUse the command: /guidelimitation ").append(option).append(" equal <value>");
+                    sendMessage(chat_id, response.toString());
+                } else {
+                    sendMessage(chat_id, "Invalid option. Try again with a number between 1 and " + possibleValues.keySet().size());
+                }
+            } catch (NumberFormatException e) {
+                sendMessage(chat_id, "Please enter a valid number after the command.");
+            }
+        } else if (parts.length == 4 && parts[2].equalsIgnoreCase("equal")) {
+            try {
+                int option = Integer.parseInt(parts[1]);
+                List<String> keys = new ArrayList<>(possibleValues.keySet());
+
+                if (option >= 1 && option <= keys.size()) {
+                    String selectedKey = keys.get(option - 1);
+                    String selectedValue = parts[3];
+
+                    if (possibleValues.get(selectedKey).contains(selectedValue)) {
+                        String queryPart = selectedKey + " = '" + selectedValue + "'";
+                        limitations.get(chat_id).add(queryPart);
+                        sendMessage(chat_id, "Limitation added: " + queryPart);
+                    } else {
+                        sendMessage(chat_id, "Invalid value for " + selectedKey + ". Try one of the following:\n" +
+                                String.join(", ", possibleValues.get(selectedKey)));
+                    }
+                } else {
+                    sendMessage(chat_id, "Invalid option. Try again with a number between 1 and " + possibleValues.keySet().size());
+                }
+            } catch (NumberFormatException e) {
+                sendMessage(chat_id, "Please enter a valid number after the command.");
+            }
         } else {
-            limitations.remove(condition);
-            sendMessage(chat_id, "Limitation not added. It would leave fewer than 2 champions.");
+            sendMessage(chat_id, "Invalid command format. Use /guidelimitation or /guidelimitation <number> for more information.");
         }
-    }
-
-    private void guideLimitation(long chat_id, String messageText) {
-        String info = "Se vuoi impostare delle limitazioni segui questa guida:" +
-                "impostare su quale argomento creare una limitazione:" +
-                "   1) Gender" +
-                "   2) Species" +
-                "   3) Region" +
-                "   4) Position" +
-                "   5) Class" +
-                "   6) Range Type" +
-                "   7) Resource" +
-                "   8) release Year";
-        sendMessage(chat_id, info);
     }
 
     private void clearLimitations(long chat_id) {
@@ -283,7 +316,6 @@ public class Bot implements LongPollingSingleThreadUpdateConsumer {
 
     private void play(long chat_id) {
         onGames.put(chat_id, new Game(randomChamp(chat_id)));
-        limitations.putIfAbsent(chat_id, new ArrayList<>());
         System.out.println(onGames.get(chat_id).randomName);
         sendMessage(chat_id, "Random Champion has been extracted. Use the command /try to try the game");
     }
@@ -318,14 +350,14 @@ public class Bot implements LongPollingSingleThreadUpdateConsumer {
         Scraper scraper = new Scraper();
 
         List<String> champions = scraper.findAllChampions();
-        System.out.println("Lista dei campioni trovati: " + champions);
+        System.out.println("List of champion found: " + champions);
 
         for (String champ : champions) {
             LOLChamp a = scraper.getChamp(champ);
             db.insertChamp(a);
         }
 
-        sendMessage(chat_id, "Lista dei campioni aggiornata");
+        sendMessage(chat_id, "Updated list of champion");
     }
 
     private void sendMessage(long chat_id, String text) {

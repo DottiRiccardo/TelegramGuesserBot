@@ -190,18 +190,15 @@ public class DB {
     public Map<String, List<String>> getPossibleValues() {
         Map<String, List<String>> possibleValues = new HashMap<>();
 
-        // Query per LOLChamp
         String lolChampQuery = "SELECT DISTINCT Gender, Resource, RangeType, ReleaseYear FROM LOLChamp";
         try (PreparedStatement stmt = conn.prepareStatement(lolChampQuery);
              ResultSet rs = stmt.executeQuery()) {
 
-            // Inizializza le liste
-            List<String> genders = new ArrayList<>();
-            List<String> resources = new ArrayList<>();
-            List<String> rangeTypes = new ArrayList<>();
-            List<String> releaseYears = new ArrayList<>();
+            Set<String> genders = new HashSet<>();
+            Set<String> resources = new HashSet<>();
+            Set<String> rangeTypes = new HashSet<>();
+            Set<String> releaseYears = new HashSet<>();
 
-            // Popola le liste
             while (rs.next()) {
                 genders.add(rs.getString("Gender"));
                 resources.add(rs.getString("Resource"));
@@ -209,33 +206,42 @@ public class DB {
                 releaseYears.add(String.valueOf(rs.getInt("ReleaseYear")));
             }
 
-            // Aggiunge i valori alla mappa
-            possibleValues.put("Gender", genders);
-            possibleValues.put("Resource", resources);
-            possibleValues.put("RangeType", rangeTypes);
-            possibleValues.put("ReleaseYear", releaseYears);
+            List<String> sortedGenders = new ArrayList<>(genders);
+            List<String> sortedResources = new ArrayList<>(resources);
+            List<String> sortedRangeTypes = new ArrayList<>(rangeTypes);
+            List<String> sortedReleaseYears = new ArrayList<>(releaseYears);
+
+            Collections.sort(sortedGenders);
+            Collections.sort(sortedResources);
+            Collections.sort(sortedRangeTypes);
+            Collections.sort(sortedReleaseYears);
+
+            possibleValues.put("Gender", sortedGenders);
+            possibleValues.put("Resource", sortedResources);
+            possibleValues.put("RangeType", sortedRangeTypes);
+            possibleValues.put("ReleaseYear", sortedReleaseYears);
 
         } catch (SQLException e) {
             e.printStackTrace();
         }
 
-        // Query per Assoc
         String assocQuery = "SELECT DISTINCT Type, Name FROM Assoc";
         try (PreparedStatement stmt = conn.prepareStatement(assocQuery);
              ResultSet rs = stmt.executeQuery()) {
 
-            Map<String, List<String>> assocValues = new HashMap<>();
+            Map<String, Set<String>> assocValues = new HashMap<>();
 
             while (rs.next()) {
                 String type = rs.getString("Type");
                 String name = rs.getString("Name");
-                assocValues.putIfAbsent(type, new ArrayList<>());
+                assocValues.putIfAbsent(type, new HashSet<>());
                 assocValues.get(type).add(name);
             }
 
-            // Aggiunge i valori alla mappa
-            for (Map.Entry<String, List<String>> entry : assocValues.entrySet()) {
-                possibleValues.put(entry.getKey(), entry.getValue());
+            for (Map.Entry<String, Set<String>> entry : assocValues.entrySet()) {
+                List<String> sortedNames = new ArrayList<>(entry.getValue());
+                Collections.sort(sortedNames);
+                possibleValues.put(entry.getKey(), sortedNames);
             }
 
         } catch (SQLException e) {
@@ -253,7 +259,7 @@ public class DB {
         String query = "INSERT INTO Player (Chat_id, Username) VALUES (?, ?)";
         try {
             PreparedStatement stmt = conn.prepareStatement(query);
-            stmt.setLong(1, chat_id); // Imposta il chat_id
+            stmt.setLong(1, chat_id);
             stmt.setString(2, username);
             stmt.executeUpdate();
         } catch (SQLException e) {
@@ -261,21 +267,21 @@ public class DB {
         }
     }
 
-    // Funzione per controllare se un chat_id esiste nel database
     public boolean checkChatId(long chat_id) {
         String query = "SELECT 1 FROM Player WHERE Chat_id = ?";
         try {
             PreparedStatement stmt = conn.prepareStatement(query);
             stmt.setLong(1, chat_id);
             ResultSet rs = stmt.executeQuery();
-            return rs.next(); // Se il risultato è presente, il chat_id esiste
+            return rs.next();
         } catch (SQLException e) {
             e.printStackTrace();
         }
         return false;
     }
+
     public boolean usernameExists(String username) {
-        String query = "SELECT COUNT(*) FROM players WHERE username = ?";
+        String query = "SELECT COUNT(*) FROM player WHERE username = ?";
         try {
             PreparedStatement stmt = conn.prepareStatement(query);
             stmt.setString(1, username);
@@ -288,7 +294,7 @@ public class DB {
         }
         return false;
     }
-    // Funzione per ottenere il username dato un chat_id
+
     public String getUsername(long chat_id) {
         String query = "SELECT Username FROM Player WHERE Chat_id = ?";
         try {
@@ -304,7 +310,6 @@ public class DB {
         return null;
     }
 
-    // Funzione per aggiornare le statistiche del giocatore
     public void updateStats(long chat_id, int champFound, float averageTry) {
         String query = "UPDATE Player SET ChampFound = ?, AverageTry = ? WHERE Chat_id = ?";
         try {
@@ -318,17 +323,14 @@ public class DB {
         }
     }
 
-    // Funzione per selezionare un giocatore
     public PlayerStats getStats(long chat_id) {
         String query = "SELECT Username, ChampFound, AverageTry FROM Player WHERE Chat_id = ?";
-        PlayerStats stats = null;
+        PlayerStats stats = new PlayerStats();
 
         try (PreparedStatement stmt = conn.prepareStatement(query)) {
             stmt.setLong(1, chat_id);
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
-                    // Crea un oggetto PlayerStats con le informazioni recuperate
-                    stats = new PlayerStats();
                     stats.ChampFound = rs.getInt("ChampFound");
                     stats.AverageTry = rs.getFloat("AverageTry");
                 }

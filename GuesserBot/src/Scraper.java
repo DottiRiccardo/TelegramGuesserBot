@@ -97,11 +97,11 @@ public class Scraper {
                                     if (!specie.select("s").isEmpty()) {
                                         continue;
                                     } else {
-                                        Champ.species.add(specie.text().replaceAll("\\(.*?\\)", "").trim());
+                                        Champ.species.add(specie.text().replaceAll("\\(.*?\\)", "").replaceAll("\\[.*?\\]", "").trim());
                                     }
                                 }
                             } else {
-                                Champ.species.add(value.text().replaceAll("\\(.*?\\)", "").trim());
+                                Champ.species.add(value.text().replaceAll("\\(.*?\\)", "").replaceAll("\\[.*?\\]", "").trim());
                             }
                             break;
                         case "Region(s)":

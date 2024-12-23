@@ -1,9 +1,15 @@
 public class Game {
     String randomName;
-    private int nTry = 0;
+    private int nTry;
+
+    public Game () {
+        randomName = null;
+        nTry = 0;
+    }
 
     public Game (String randomName) {
         this.randomName = randomName;
+        nTry = 0;
     }
 
     public void incriseNTry(){
