@@ -46,7 +46,7 @@ public class Scraper {
                 if (label != null && value != null) {
                     switch (label.text()) {
                         case "Position(s)":
-                            Champ.positions = Arrays.asList(value.text().split("\\s+"));
+                            Champ.positions = Arrays.asList(value.text().split("\\s+")); // toglie le parentesi e il loro contenuto
                             break;
                         case "Legacy":
                             Champ.classes = Arrays.asList(value.text().split("\\s+"));

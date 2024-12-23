@@ -1,20 +1,14 @@
 import org.telegram.telegrambots.longpolling.TelegramBotsLongPollingApplication;
+
 import java.util.List;
+import java.util.Map;
 
 public class Main {
     public static void main(String[] args) {
-
-        Scraper scraper = new Scraper();
         DB db = new DB("tguesserbot", "root", "");
+        Map<String, List<String>> possibleValues = db.getPossibleValues();
 
-        List<String> champions = scraper.findAllChampions();
-        System.out.println("Lista dei campioni trovati: " + champions);
-
-        for (String champ : champions) {
-            LOLChamp a = scraper.getChamp(champ);
-            db.insertChamp(a);
-        }
-
+        printMap(possibleValues);
         /*
         String botToken = "7420686675:AAHhkvjQl8B3lZ-xYOLynY9AgPggFPcTQj4";
         try (TelegramBotsLongPollingApplication botsApplication = new TelegramBotsLongPollingApplication()) {
@@ -26,4 +20,16 @@ public class Main {
         }
          */
     }
+    public static void printMap(Map<String, List<String>> map) {
+        for (Map.Entry<String, List<String>> entry : map.entrySet()) {
+            String key = entry.getKey();
+            List<String> values = entry.getValue();
+
+            System.out.println(key + ":");
+            for (String value : values) {
+                System.out.println("  - " + value);
+            }
+        }
+    }
+
 }

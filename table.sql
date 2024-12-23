@@ -1,6 +1,6 @@
 CREATE TABLE Player (
-    Username VARCHAR(50) PRIMARY KEY,
-    Password VARCHAR(100) NOT NULL,
+    Chat_id BIGINT PRIMARY KEY,
+    Username VARCHAR(50) UNIQUE NOT NULL,
     ChampFound INT,
     AverageTry FLOAT
 );

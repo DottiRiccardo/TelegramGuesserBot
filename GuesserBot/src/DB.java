@@ -1,6 +1,5 @@
 import java.sql.*;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 public class DB {
     private Connection conn;
@@ -13,6 +12,10 @@ public class DB {
             e.printStackTrace();
         }
     }
+
+
+    // CHAMP
+
 
     public void insertChamp(LOLChamp champ) {
         if (isChampExists(champ.name)) {
@@ -111,7 +114,7 @@ public class DB {
         }
     }
 
-    public LOLChamp getLOLChampByName(String name) {
+    public LOLChamp getChampByName(String name) {
         LOLChamp champ = null;
         name = name.contains("&") ? name.split("&")[0].trim() : name;
 
@@ -159,179 +162,141 @@ public class DB {
     }
 
 
+    // LIMITAZIONI
 
 
-    // 1. Inserisci un campione completo
-    public void insertChampion(LOLChamp champ) {
+    public List<String> getChampNamesByCases(List<String> cases) {
+        List<String> champNames = new ArrayList<>();
 
-        try {
-            String insertChampQuery = "INSERT INTO LOLChamp (Name, Gender, Resource, RangeType, ReleaseYear) VALUES (?, ?, ?, ?, ?)";
-            try (PreparedStatement champStmt = conn.prepareStatement(insertChampQuery)) {
-                champStmt.setString(1, champ.name);
-                champStmt.setString(2, champ.gender);
-                champStmt.setString(3, champ.resource);
-                champStmt.setString(4, champ.rangeType);
-                champStmt.setInt(5, champ.releaseYear);
-                champStmt.executeUpdate();
-            }
-
-            // AssSpecies
-            String insertSpeciesQuery = "INSERT INTO AssSpecies (ChampName, SpeciesName) VALUES (?, ?)";
-            try (PreparedStatement speciesStmt = conn.prepareStatement(insertSpeciesQuery)) {
-                for (String species : champ.species) {
-                    speciesStmt.setString(1, champ.name);
-                    speciesStmt.setString(2, species);
-                    speciesStmt.addBatch();
-                }
-                speciesStmt.executeBatch();
-            }
-
-            // AssRegion
-            String insertRegionsQuery = "INSERT INTO AssRegion (ChampName, RegionName) VALUES (?, ?)";
-            try (PreparedStatement regionStmt = conn.prepareStatement(insertRegionsQuery)) {
-                for (String region : champ.regions) {
-                    regionStmt.setString(1, champ.name);
-                    regionStmt.setString(2, region);
-                    regionStmt.addBatch();
-                }
-                regionStmt.executeBatch();
-            }
-
-            // AssPosition
-            String insertPositionsQuery = "INSERT INTO AssPosition (ChampName, PositionName) VALUES (?, ?)";
-            try (PreparedStatement positionStmt = conn.prepareStatement(insertPositionsQuery)) {
-                for (String position : champ.positions) {
-                    positionStmt.setString(1, champ.name);
-                    positionStmt.setString(2, position);
-                    positionStmt.addBatch();
-                }
-                positionStmt.executeBatch();
-            }
-
-            // AssClass
-            String insertClassesQuery = "INSERT INTO AssClass (ChampName, ClassName) VALUES (?, ?)";
-            try (PreparedStatement classStmt = conn.prepareStatement(insertClassesQuery)) {
-                for (String clazz : champ.classes) {
-                    classStmt.setString(1, champ.name);
-                    classStmt.setString(2, clazz);
-                    classStmt.addBatch();
-                }
-                classStmt.executeBatch();
-            }
-
-        } catch (SQLException e) {
-            try {
-                conn.rollback(); // Rollback in case of error
-            } catch (SQLException ex) {
-                throw new RuntimeException(ex);
-            }
-            e.printStackTrace();
+        StringBuilder query = new StringBuilder("SELECT Name FROM LOLChamp");
+        if (!cases.isEmpty()) {
+            query.append(" WHERE ");
+            query.append(String.join(" AND ", cases));
         }
-    }
 
-    private void insertIfNotExists(String tableName, String value) throws SQLException {
-        String query = "INSERT IGNORE INTO " + tableName + " (Name) VALUES (?)";
-        PreparedStatement stmt = conn.prepareStatement(query);
-        stmt.setString(1, value);
-        stmt.executeUpdate();
-    }
+        try (PreparedStatement stmt = conn.prepareStatement(query.toString());
+             ResultSet rs = stmt.executeQuery()) {
 
-    private void insertAssociation(String tableName, String champName, String associatedName) throws SQLException {
-        String query = "INSERT IGNORE INTO " + tableName + " (ChampName, " + tableName.replace("Ass", "") + "Name) VALUES (?, ?)";
-        PreparedStatement stmt = conn.prepareStatement(query);
-        stmt.setString(1, champName);
-        stmt.setString(2, associatedName);
-        stmt.executeUpdate();
-    }
-
-    // 2. Seleziona un campione con tutte le informazioni (incluse associazioni)
-    public void selectChampionByName(String champName) {
-        String query = """
-        SELECT 
-            c.Name, 
-            c.Gender, 
-            c.Resource, 
-            c.RangeType, 
-            c.ReleaseYear,
-            GROUP_CONCAT(DISTINCT p.Name) AS Positions,
-            GROUP_CONCAT(DISTINCT cl.Name) AS Classes,
-            GROUP_CONCAT(DISTINCT s.Name) AS Species,
-            GROUP_CONCAT(DISTINCT r.Name) AS Regions
-        FROM 
-            LOLChamp c
-        LEFT JOIN AssPosition ap ON c.Name = ap.ChampName
-        LEFT JOIN Position p ON ap.PositionName = p.Name
-        LEFT JOIN AssClass ac ON c.Name = ac.ChampName
-        LEFT JOIN Class cl ON ac.ClassName = cl.Name
-        LEFT JOIN AssSpecies aspec ON c.Name = aspec.ChampName
-        LEFT JOIN Species s ON aspec.SpeciesName = s.Name
-        LEFT JOIN AssRegion ar ON c.Name = ar.ChampName
-        LEFT JOIN Region r ON ar.RegionName = r.Name
-        WHERE 
-            c.Name = ?
-        GROUP BY 
-            c.Name, c.Gender, c.Resource, c.RangeType, c.ReleaseYear
-    """;
-
-        try {
-            PreparedStatement stmt = conn.prepareStatement(query);
-            stmt.setString(1, champName);
-            ResultSet rs = stmt.executeQuery();
-
-            if (rs.next()) {
-                System.out.println("Name: " + rs.getString("Name"));
-                System.out.println("Gender: " + rs.getString("Gender"));
-                System.out.println("Resource: " + rs.getString("Resource"));
-                System.out.println("RangeType: " + rs.getString("RangeType"));
-                System.out.println("ReleaseYear: " + rs.getInt("ReleaseYear"));
-                System.out.println("Positions: " + rs.getString("Positions"));
-                System.out.println("Classes: " + rs.getString("Classes"));
-                System.out.println("Species: " + rs.getString("Species"));
-                System.out.println("Regions: " + rs.getString("Regions"));
-            } else {
-                System.out.println("Champion not found.");
+            while (rs.next()) {
+                champNames.add(rs.getString("Name"));
             }
         } catch (SQLException e) {
             e.printStackTrace();
         }
+
+        return champNames;
     }
 
-    // 3. Inserisci un player con nome e password
-    public void insertPlayer(String username, String password) {
-        String query = "INSERT INTO Player (Username, Password) VALUES (?, ?)";
+    public Map<String, List<String>> getPossibleValues() {
+        Map<String, List<String>> possibleValues = new HashMap<>();
+
+        // Query per LOLChamp
+        String lolChampQuery = "SELECT DISTINCT Gender, Resource, RangeType, ReleaseYear FROM LOLChamp";
+        try (PreparedStatement stmt = conn.prepareStatement(lolChampQuery);
+             ResultSet rs = stmt.executeQuery()) {
+
+            // Inizializza le liste
+            List<String> genders = new ArrayList<>();
+            List<String> resources = new ArrayList<>();
+            List<String> rangeTypes = new ArrayList<>();
+            List<String> releaseYears = new ArrayList<>();
+
+            // Popola le liste
+            while (rs.next()) {
+                genders.add(rs.getString("Gender"));
+                resources.add(rs.getString("Resource"));
+                rangeTypes.add(rs.getString("RangeType"));
+                releaseYears.add(String.valueOf(rs.getInt("ReleaseYear")));
+            }
+
+            // Aggiunge i valori alla mappa
+            possibleValues.put("Gender", genders);
+            possibleValues.put("Resource", resources);
+            possibleValues.put("RangeType", rangeTypes);
+            possibleValues.put("ReleaseYear", releaseYears);
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        // Query per Assoc
+        String assocQuery = "SELECT DISTINCT Type, Name FROM Assoc";
+        try (PreparedStatement stmt = conn.prepareStatement(assocQuery);
+             ResultSet rs = stmt.executeQuery()) {
+
+            Map<String, List<String>> assocValues = new HashMap<>();
+
+            while (rs.next()) {
+                String type = rs.getString("Type");
+                String name = rs.getString("Name");
+                assocValues.putIfAbsent(type, new ArrayList<>());
+                assocValues.get(type).add(name);
+            }
+
+            // Aggiunge i valori alla mappa
+            for (Map.Entry<String, List<String>> entry : assocValues.entrySet()) {
+                possibleValues.put(entry.getKey(), entry.getValue());
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return possibleValues;
+    }
+
+
+    // PLAYER
+
+
+    public void insertPlayer(long chat_id, String username) {
+        String query = "INSERT INTO Player (Chat_id, Username) VALUES (?, ?)";
         try {
             PreparedStatement stmt = conn.prepareStatement(query);
-            stmt.setString(1, username);
-            stmt.setString(2, password);
+            stmt.setLong(1, chat_id); // Imposta il chat_id
+            stmt.setString(2, username);
             stmt.executeUpdate();
         } catch (SQLException e) {
             e.printStackTrace();
         }
     }
 
-    // 4. Aggiorna ChampFound e AverageTry di un player
-    public void updatePlayerStats(String username, int champFound, float averageTry) {
-        String query = "UPDATE Player SET ChampFound = ?, AverageTry = ? WHERE Username = ?";
+    // Funzione per controllare se un chat_id esiste nel database
+    public boolean checkChatId(long chat_id) {
+        String query = "SELECT 1 FROM Player WHERE Chat_id = ?";
         try {
             PreparedStatement stmt = conn.prepareStatement(query);
-            stmt.setInt(1, champFound);
-            stmt.setFloat(2, averageTry);
-            stmt.setString(3, username);
-            stmt.executeUpdate();
+            stmt.setLong(1, chat_id);
+            ResultSet rs = stmt.executeQuery();
+            return rs.next(); // Se il risultato è presente, il chat_id esiste
         } catch (SQLException e) {
             e.printStackTrace();
         }
+        return false;
     }
-
-    // 5. Seleziona solo la password di un player
-    public String getPlayerPassword(String username) {
-        String query = "SELECT Password FROM Player WHERE Username = ?";
+    public boolean usernameExists(String username) {
+        String query = "SELECT COUNT(*) FROM players WHERE username = ?";
         try {
             PreparedStatement stmt = conn.prepareStatement(query);
             stmt.setString(1, username);
             ResultSet rs = stmt.executeQuery();
             if (rs.next()) {
-                return rs.getString("Password");
+                return rs.getInt(1) > 0;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+    // Funzione per ottenere il username dato un chat_id
+    public String getUsername(long chat_id) {
+        String query = "SELECT Username FROM Player WHERE Chat_id = ?";
+        try {
+            PreparedStatement stmt = conn.prepareStatement(query);
+            stmt.setLong(1, chat_id);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return rs.getString("Username");
             }
         } catch (SQLException e) {
             e.printStackTrace();
@@ -339,22 +304,62 @@ public class DB {
         return null;
     }
 
-    // 6. Seleziona tutti i dettagli di un player
-    public void selectPlayer(String username) {
-        String query = "SELECT * FROM Player WHERE Username = ?";
+    // Funzione per aggiornare le statistiche del giocatore
+    public void updateStats(long chat_id, int champFound, float averageTry) {
+        String query = "UPDATE Player SET ChampFound = ?, AverageTry = ? WHERE Chat_id = ?";
         try {
             PreparedStatement stmt = conn.prepareStatement(query);
-            stmt.setString(1, username);
-            ResultSet rs = stmt.executeQuery();
+            stmt.setInt(1, champFound);
+            stmt.setFloat(2, averageTry);
+            stmt.setLong(3, chat_id);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
 
-            while (rs.next()) {
-                System.out.println("Username: " + rs.getString("Username"));
-                System.out.println("Password: " + rs.getString("Password"));
-                System.out.println("ChampFound: " + rs.getInt("ChampFound"));
-                System.out.println("AverageTry: " + rs.getFloat("AverageTry"));
+    // Funzione per selezionare un giocatore
+    public PlayerStats getStats(long chat_id) {
+        String query = "SELECT Username, ChampFound, AverageTry FROM Player WHERE Chat_id = ?";
+        PlayerStats stats = null;
+
+        try (PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setLong(1, chat_id);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    // Crea un oggetto PlayerStats con le informazioni recuperate
+                    stats = new PlayerStats();
+                    stats.ChampFound = rs.getInt("ChampFound");
+                    stats.AverageTry = rs.getFloat("AverageTry");
+                }
             }
         } catch (SQLException e) {
             e.printStackTrace();
         }
+
+        return stats;
+    }
+
+    public List<String> getTopPlayers(int n) {
+        String query = "SELECT Username " +
+                "FROM Player " +
+                "WHERE ChampFound >= 10 " +
+                "ORDER BY AverageTry ASC " +
+                "LIMIT ?";
+        List<String> topPlayers = new ArrayList<>();
+
+        try {
+            PreparedStatement stmt = conn.prepareStatement(query);
+            stmt.setInt(1, n);
+            ResultSet rs = stmt.executeQuery();
+
+            while (rs.next()) {
+                topPlayers.add(rs.getString("Username"));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return topPlayers;
     }
 }

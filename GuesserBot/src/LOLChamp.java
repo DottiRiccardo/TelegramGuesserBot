@@ -25,7 +25,6 @@ public class LOLChamp {
     @Override
     public String toString() {
         return "LOLChamp{" +
-                "name='" + name + '\'' +
                 ", gender='" + gender + '\'' +
                 ", resource='" + resource + '\'' +
                 ", rangeType='" + rangeType + '\'' +
